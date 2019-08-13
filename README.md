@@ -19,3 +19,17 @@ docker run \
     --env "DNSMASQ_ADDRESSES=/.mydomain.com/192.168.1.100,/.otherdomain.com/192.168.1.200" \
     dns-proxy
 ```
+
+## Architecture
+
+Pretty simple.
+
+1. [dnsmasq](http://www.thekelleys.org.uk/dnsmasq/doc.html) handles all requests.
+2. If the request doesn't match any of the configured `address` directives and the response is not already cached, the requested is forwarded to Stubby.
+3. [Stubby](https://dnsprivacy.org/wiki/x/JYAT) forwards the request to one of the configured upstream DNS-over-TLS providers.
+
+```
+┏━━━━━━━━┓   query   ┏━━━━━━━━━┓   forward   ┏━━━━━━━━┓   forward   ┏━━━━━━━━━━┓
+┃ client ┃<━━━━━━━━━>┃ dnsmasq ┃<━━━━━━━━━━━>┃ stubby ┃<━━━━━━━━━━━>┃ upstream ┃
+┗━━━━━━━━┛   (DNS)   ┗━━━━━━━━━┛   (local)   ┗━━━━━━━━┛    (DoT)    ┗━━━━━━━━━━┛
+```
