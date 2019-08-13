@@ -1,0 +1,13 @@
+version: "3"
+
+services:
+  dns-proxy:
+    build: .
+    restart: always
+    container_name: dns-proxy
+    network_mode: host
+    environment:
+      - "DNSMASQ_ADDRESSES="
+    ports:
+      - 53:53/udp
+    dns: 127.0.0.1

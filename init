@@ -1,0 +1,8 @@
+#!/bin/bash
+
+IFS=',' read -ra addresses <<< "$DNSMASQ_ADDRESSES"
+for addr in "${addresses[@]}"; do
+    echo "address=${addr}" >> /etc/dnsmasq.conf
+done
+
+exec /usr/bin/runsvdir /etc/service
