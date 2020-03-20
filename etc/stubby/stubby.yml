@@ -228,10 +228,13 @@ upstream_recursive_servers:
 #  - address_data: 9.9.9.10
 #    tls_auth_name: "dns.quad9.net"
 ## Cloudflare 1.1.1.1 and 1.0.0.1
-  - address_data: 1.1.1.1
-    tls_auth_name: "cloudflare-dns.com"
-  - address_data: 1.0.0.1
-    tls_auth_name: "cloudflare-dns.com"
+#  - address_data: 1.1.1.1
+#    tls_auth_name: "cloudflare-dns.com"
+#  - address_data: 1.0.0.1
+#    tls_auth_name: "cloudflare-dns.com"
+## NixNet
+  - address_data: 198.251.90.114
+    tls_auth_name: "uncensored.any.dns.nixnet.xyz"
 ## The Uncensored DNS servers
 #  - address_data: 89.233.43.71
 #    tls_auth_name: "unicast.censurfridns.dk"
