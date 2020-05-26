@@ -65,16 +65,20 @@ edns_client_subnet_private : 1
 ############################# CONNECTION SETTINGS ##############################
 # Set to 1 to instruct stubby to distribute queries across all available name
 # servers - this will use multiple simultaneous connections which can give
-# better performance is most (but not all) cases.
+# better performance in most (but not all) cases.
 # Set to 0 to treat the upstreams below as an ordered list and use a single
 # upstream until it becomes unavailable, then use the next one.
 round_robin_upstreams: 1
 
-# EDNS0 option for keepalive idle timeout in ms as specified in
+# EDNS0 option for keepalive idle timeout in milliseconds as specified in
 # https://tools.ietf.org/html/rfc7828
 # This keeps idle TLS connections open to avoid the overhead of opening a new
-# connection for every query.
-idle_timeout: 10000
+# connection for every query. Note that if a given server doesn't implement 
+# EDNS0 keepalive and uses an idle timeout shorter than this stubby will backoff
+# from using that server because the server is always closing the connection.
+# This can degrade performance for certain configurations so reducing the
+# idle_timeout to below that of that lowest server value is recommended.
+idle_timeout: 9000
 
 # Control the maximum number of connection failures that will be permitted
 # before Stubby backs-off from using an individual upstream (default 2)
@@ -84,16 +88,16 @@ idle_timeout: 10000
 # individual upstream after failures under normal circumstances (default 3600)
 # tls_backoff_time: 300
 
-# Specify where the location for CA certificates for verification purposes are
-# located.
+# Specify the location for CA certificates used for verification purposes are
+# located - this overrides the OS specific default location.
 # tls_ca_path: "/etc/ssl/certs/"
 
 # Limit the total number of outstanding queries permitted
 # limit_outstanding_queries: 100
 
-# Specify the timeout on getting a response to an individual request
-# (default 5s)
-# timeout: 1
+# Specify the timeout in milliseconds on getting a response to an individual
+# request (default 5000)
+# timeout: 1000
 
 # Set the acceptable ciphers for DNS over TLS.  With OpenSSL 1.1.1 this list is
 # for TLS1.2 and older only. Ciphers for TLS1.3 should be set with the
@@ -132,8 +136,9 @@ listen_addresses:
 # Stubby tries to fetch and validate the DNSSEC root trust anchor on the fly
 # when needed (Zero configuration DNSSEC), but only if it can store then
 # somewhere.  The default location to store these files is the ".getdns"
-# subdirectory in the user's home directory. If there is no home directory, or
-# the .getdns subdirectory could not be created (or is not present), Stubby
+# subdirectory in the user's home directory on Unixes, and the %appdata%\getdns
+# directory on Windows. If there is no home directory, or
+# the required subdirectory could not be created (or is not present), Stubby
 # will fall back to the current working directory to try to store the
 # trust-anchor files.
 #
@@ -149,8 +154,8 @@ listen_addresses:
 # in milliseconds (which defaults to two and a half seconds).
 # trust_anchors_backoff_time: 2500
 
-# Specify the location of the installed trust anchor file (leave commented out
-# for zero configuration DNSSEC)
+# Specify the location of the installed trust anchor file to override the 
+# default location (see above)
 # dnssec_trust_anchors: "/etc/unbound/getdns-root.key"
 
 
@@ -175,6 +180,13 @@ listen_addresses:
 #       value: Base64 encoded value of the sha256 fingerprint of the public
 #              key
 #   tls_port: Port for TLS (default is 853)
+
+# To always use the DHCP resolvers provided by the local network in Opportunistic
+# mode then
+# 1) In the dns_transport_list after TLS add UDP then TCP
+# 2) Change to tls_authentication: GETDNS_AUTHENTICATION_NONE
+# 3) Remove all the upstream_recursive_servers listed below
+
 upstream_recursive_servers:
 ############################ DEFAULT UPSTREAMS  ################################
 ####### IPv4 addresses ######
@@ -220,21 +232,18 @@ upstream_recursive_servers:
 ############################ OPTIONAL UPSTREAMS  ###############################
 ####### IPv4 addresses ######
 ### Anycast services ###
-## Quad 9 'secure' service - Filters, does DNSSEC, doesn't send ECS
+# Quad 9 'secure' service - Filters, does DNSSEC, doesn't send ECS
   - address_data: 9.9.9.9
     tls_auth_name: "dns.quad9.net"
-## Quad 9 'insecure' service - No filtering, does DNSSEC, may send ECS (it is
-## unclear if it honours the edns_client_subnet_private request from stubby)
+## Quad 9 'insecure' service - No filtering, no DNSSEC, doesn't send ECS
 #  - address_data: 9.9.9.10
 #    tls_auth_name: "dns.quad9.net"
-## Cloudflare 1.1.1.1 and 1.0.0.1
-#  - address_data: 1.1.1.1
-#    tls_auth_name: "cloudflare-dns.com"
-#  - address_data: 1.0.0.1
-#    tls_auth_name: "cloudflare-dns.com"
-## NixNet
-  - address_data: 198.251.90.114
-    tls_auth_name: "uncensored.any.dns.nixnet.xyz"
+# Cloudflare 1.1.1.1 and 1.0.0.1
+# (NOTE: recommend reducing idle_timeout to 9000 if using Coudflare)
+  - address_data: 1.1.1.1
+    tls_auth_name: "cloudflare-dns.com"
+  - address_data: 1.0.0.1
+    tls_auth_name: "cloudflare-dns.com"
 ## The Uncensored DNS servers
 #  - address_data: 89.233.43.71
 #    tls_auth_name: "unicast.censurfridns.dk"
@@ -252,6 +261,16 @@ upstream_recursive_servers:
 #    tls_auth_name: "dns.google"
 #  - address_data: 8.8.4.4
 #    tls_auth_name: "dns.google"
+# Adguard Default servers
+  - address_data: 176.103.130.130
+    tls_auth_name: "dns.adguard.com"
+  - address_data: 176.103.130.131
+    tls_auth_name: "dns.adguard.com"
+## Adguard Family Protection servers
+#  - address_data: 176.103.130.132
+#    tls_auth_name: "dns-family.adguard.com"
+#  - address_data: 176.103.130.134
+#    tls_auth_name: "dns-family.adguard.com"
 ### Test servers ###
 ## A Surfnet/Sinodun server supporting TLS 1.2 and 1.3
 #  - address_data: 145.100.185.18
@@ -281,12 +300,6 @@ upstream_recursive_servers:
 #    tls_pubkey_pinset:
 #      - digest: "sha256"
 #        value: AAT+rHoKx5wQkWhxlfrIybFocBu3RBrPD2/ySwIwmvA=
-## dot.securedns.eu
-#  - address_data: 146.185.167.43
-#    tls_auth_name: "dot.securedns.eu"
-#    tls_pubkey_pinset:
-#      - digest: "sha256"
-#        value: h3mufC43MEqRD6uE4lz6gAgULZ5/riqH/E+U+jE3H8g=
 ## dns-tls.bitwiseshift.net
 #  - address_data: 81.187.221.24
 #    tls_auth_name: "dns-tls.bitwiseshift.net"
@@ -327,6 +340,9 @@ upstream_recursive_servers:
 #    tls_pubkey_pinset:
 #      - digest: "sha256"
 #        value: sG6kj+XJToXwt1M6+9BeCz1SOj/1/mdZn56OZvCyZZc=
+## Foundation for Applied Privacy 
+#  - address_data: 93.177.65.183
+#    tls_auth_name: "dot1.applied-privacy.net"
 ## # OARC. Note: this server currently doesn't support strict mode!
 ##   - address_data: 184.105.193.78
 ##     tls_auth_name: "tls-dns-u.odvr.dns-oarc.net"
@@ -344,6 +360,7 @@ upstream_recursive_servers:
 #  - address_data: 2620:fe::10
 #    tls_auth_name: "dns.quad9.net"
 ## Cloudflare servers
+## (NOTE: recommend reducing idle_timeout to 9000 if using Coudflare)
 #  - address_data: 2606:4700:4700::1111
 #    tls_auth_name: "cloudflare-dns.com"
 #  - address_data: 2606:4700:4700::1001
@@ -353,6 +370,16 @@ upstream_recursive_servers:
 #    tls_auth_name: "dns.google"
 #  - address_data: 2001:4860:4860::8844
 #    tls_auth_name: "dns.google"
+## Adguard Default servers
+#  - address_data: 2a00:5a60::ad1:0ff
+#    tls_auth_name: "dns.adguard.com"
+#  - address_data: 2a00:5a60::ad2:0ff
+#    tls_auth_name: "dns.adguard.com"
+## Adguard Family Protection servers
+#  - address_data: 2a00:5a60::bad1:0ff
+#    tls_auth_name: "dns-family.adguard.com"
+#  - address_data: 2a00:5a60::bad2:0ff
+#    tls_auth_name: "dns-family.adguard.com"
 ### Test servers ###
 ## The Uncensored DNS server
 #  - address_data: 2a01:3a0:53:53::0
@@ -388,12 +415,6 @@ upstream_recursive_servers:
 #        value: 3IOHSS48KOc/zlkKGtI46a9TY9PPKDVGhE3W2ZS4JZo=
 #      - digest: "sha256"
 #        value: 5zFN3smRPuHIlM/8L+hANt99LW26T97RFHqHv90awjo=
-## dot.securedns.eu
-#  - address_data: 2a03:b0c0:0:1010::e9a:3001
-#    tls_auth_name: "dot.securedns.eu"
-#    tls_pubkey_pinset:
-#      - digest: "sha256"
-#        value: h3mufC43MEqRD6uE4lz6gAgULZ5/riqH/E+U+jE3H8g=
 ## dns-tls.bitwiseshift.net
 #  - address_data: 2001:8b0:24:24::24
 #    tls_auth_name: "dns-tls.bitwiseshift.net"
@@ -434,6 +455,9 @@ upstream_recursive_servers:
 #    tls_pubkey_pinset:
 #      - digest: "sha256"
 #        value: sG6kj+XJToXwt1M6+9BeCz1SOj/1/mdZn56OZvCyZZc=
+## Foundation for Applied Privacy 
+#  - address_data: 2a03:4000:38:53c::2
+#    tls_auth_name: "dot1.applied-privacy.net"
 ## # OARC. Note: this server currently doesn't support strict mode!
 ##   - address_data: 2620:ff:c000:0:1::64:25
 ##     tls_auth_name: "tls-dns-u.odvr.dns-oarc.net"
@@ -513,3 +537,10 @@ upstream_recursive_servers:
 #    tls_pubkey_pinset:
 #      - digest: "sha256"
 #        value: wTeXHM8aczvhRSi0cv2qOXkXInoDU+2C+M8MpRyT3OI=
+## Foundation for Applied Privacy 
+#  - address_data: 93.177.65.183
+#    tls_port: 443
+#    tls_auth_name: "dot1.applied-privacy.net"
+#  - address_data: 2a03:4000:38:53c::2
+#    tls_port: 443
+#    tls_auth_name: "dot1.applied-privacy.net"
